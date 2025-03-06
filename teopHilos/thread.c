@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <time.h>
 
 // Estructura que representa una celda en la cuadrícula
 // tipo: 0 = Tierra Baldía (TB), 1 = Objetivo Militar (OM), 2 = Infraestructura Civil (IC)
@@ -20,7 +21,7 @@ typedef struct {
 
 // Argumentos que se pasan a cada hilo
 typedef struct {
-    int inicio, fin;         // Rango de drones a procesar
+    int inicio, fin;        // Rango de drones a procesar
     int n, m;               // Dimensiones de la cuadrícula
     int num_drones;         // Número total de drones
     Celda **teatro;         // Puntero a la cuadrícula
@@ -89,10 +90,21 @@ int main(int argc, char *argv[]) {
         fscanf(archivo, "%d %d %d %d", &drones[i].x, &drones[i].y, &drones[i].rd, &drones[i].pe);
     }
 
+    // Calculamos el minimo entre el numero de drones y la cantidad de celdas
+    int minimo = n*m < l ? n*m : l;
+    
+    // Si el numero de procesos ingresados por el usuario es mayor que "minimo", entonces el numero
+    // de procesos pasa a ser este minimo.
+    if (num_hilos > minimo){
+        num_hilos = minimo;
+    }
+
+    
     // Crea los hilos y distribuye el trabajo entre ellos
     pthread_t hilos[num_hilos];
     HiloArgs args[num_hilos];
 
+    // Colocar clock inicial
     for (int i = 0; i < num_hilos; i++) {
         args[i].inicio = i * (l / num_hilos);
         args[i].fin = (i == num_hilos - 1) ? l : args[i].inicio + (l / num_hilos);
@@ -114,6 +126,7 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
     }
+    // Colocar clock final
 
     // Cuenta el estado final de los objetos
     int om_intactos = 0, om_parciales = 0, om_destruidos = 0;
@@ -134,10 +147,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Imprime los resultados
-    printf("OM intactos: %d\n", om_intactos);
+    printf("OM sin destruir: %d\n", om_intactos);
     printf("OM parcialmente destruidos: %d\n", om_parciales);
     printf("OM totalmente destruidos: %d\n", om_destruidos);
-    printf("IC intactos: %d\n", ic_intactos);
+    printf("IC sin destruir: %d\n", ic_intactos);
     printf("IC parcialmente destruidos: %d\n", ic_parciales);
     printf("IC totalmente destruidos: %d\n", ic_destruidos);
 

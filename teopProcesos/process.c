@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <time.h>
 
 // Estructura que representa una celda en la cuadrícula
 // tipo: 0 = Tierra Baldía (TB), 1 = Objetivo Militar (OM), 2 = Infraestructura Civil (IC)
@@ -50,6 +51,7 @@ int main(int argc, char *argv[]) {
     }
 
     int num_procesos = atoi(argv[1]);
+
     FILE *archivo = fopen(argv[2], "r");
     if (!archivo) {
         perror("Error abriendo el archivo");
@@ -91,6 +93,17 @@ int main(int argc, char *argv[]) {
         fscanf(archivo, "%d %d %d %d", &drones[i].x, &drones[i].y, &drones[i].rd, &drones[i].pe);
     }
 
+    // Calculamos el minimo entre el numero de drones y la cantidad de celdas
+    int minimo = n*m < l ? n*m : l;
+    
+    // Si el numero de procesos ingresados por el usuario es mayor que "minimo", entonces el numero
+    // de procesos pasa a ser este minimo.
+    if (num_procesos > minimo){
+        num_procesos = minimo;
+    }
+    
+
+    // Colocar clock inicial
     // Crea procesos para procesar los drones en paralelo
     for (int i = 0; i < num_procesos; i++) {
         int inicio = i * (l / num_procesos);
@@ -110,15 +123,43 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < num_procesos; i++) {
         wait(NULL);
     }
+    // Colocar clock final
+
+    // Cuenta el estado final de los objetos
+    int om_intactos = 0, om_parciales = 0, om_destruidos = 0;
+    int ic_intactos = 0, ic_parciales = 0, ic_destruidos = 0;
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            if (teatro[i][j].tipo == 1) {
+                if (teatro[i][j].resistencia <= 0) om_destruidos++;
+                else if (teatro[i][j].resistencia < -1) om_parciales++;
+                else om_intactos++;
+            } else if (teatro[i][j].tipo == 2) {
+                if (teatro[i][j].resistencia <= 0) ic_destruidos++;
+                else if (teatro[i][j].resistencia > 1) ic_parciales++;
+                else ic_intactos++;
+            }
+        }
+    }
+
+    // Imprime los resultados
+    printf("OM sin destruir: %d\n", om_intactos);
+    printf("OM parcialmente destruidos: %d\n", om_parciales);
+    printf("OM totalmente destruidos: %d\n", om_destruidos);
+    printf("IC sin destruir: %d\n", ic_intactos);
+    printf("IC parcialmente destruidos: %d\n", ic_parciales);
+    printf("IC totalmente destruidos: %d\n", ic_destruidos);
+
 
     fclose(archivo);
     // Libera la memoria asignada para la cuadrícula
     for (int i = 0; i < n; i++) {
         free(teatro[i]);
-        printf("Memoria liberada correctamente para la fila %d\n", i);
+        //printf("Memoria liberada correctamente para la fila %d\n", i);
     }
     free(teatro);
-    printf("Memoria liberada correctamente para la cuadrícula\n");
+    //printf("Memoria liberada correctamente para la cuadrícula\n");
 
     return 0;
 }

@@ -59,6 +59,12 @@ int main(int argc, char *argv[]) {
     }
 
     int num_hilos = atoi(argv[1]);
+    if (num_hilos <= 0)
+    {
+        perror("El numero de hilos ingresado debe ser un numero entero positivo");
+        return 1;
+    }
+
     FILE *archivo = fopen(argv[2], "r");
     if (!archivo) {
         perror("Error abriendo el archivo");
@@ -67,6 +73,13 @@ int main(int argc, char *argv[]) {
 
     int n, m, k, l;
     fscanf(archivo, "%d %d", &n, &m);
+
+
+    if (n < 1 || m < 1)
+    {
+        perror("Las dimensiones de la cuadricula deben ser numeros enteros positivos");
+        return 1;
+    }
 
     // Asigna memoria dinámica para la cuadrícula
     Celda **teatro = (Celda **)malloc(n * sizeof(Celda *));
@@ -85,6 +98,20 @@ int main(int argc, char *argv[]) {
 
     // Lee los drones
     fscanf(archivo, "%d", &l);
+    if (l < 1)
+    {
+        perror("El numero de drones debe ser un numero entero positivo");
+
+        // Libera la memoria dinámica
+        for (int i = 0; i < n; i++) {
+            free(teatro[i]);
+        }
+        free(teatro);
+
+        return 1;
+
+    }
+
     Dron drones[l];
     for (int i = 0; i < l; i++) {
         fscanf(archivo, "%d %d %d %d", &drones[i].x, &drones[i].y, &drones[i].rd, &drones[i].pe);
@@ -99,8 +126,16 @@ int main(int argc, char *argv[]) {
         num_hilos = minimo;
     }
 
-    
-    // Crea los hilos y distribuye el trabajo entre ellos
+    if (num_hilos < 1){
+         // Libera la memoria dinámica
+        for (int i = 0; i < n; i++) {
+            free(teatro[i]);
+        }
+        free(teatro);
+
+        return 1;
+    }
+    // Crea los hilos y distribuye el trabajo entre ellos    
     pthread_t hilos[num_hilos];
     HiloArgs args[num_hilos];
 

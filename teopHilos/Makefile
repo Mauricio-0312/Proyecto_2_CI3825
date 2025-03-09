@@ -25,11 +25,11 @@ PROG=teoph
 
 ALL: $(PROG)
 
-$(PROG): thread.o
-	$(CC) $(CFLAGS) $(LIBS) -o $(PROG) thread.o
+$(PROG): thread_bueno.o
+	$(CC) $(CFLAGS) $(LIBS) -o $(PROG) thread_bueno.o
 
 thread.o: thread.c
-	$(CC) $(CFLAGS) -c thread.c
+	$(CC) $(CFLAGS) -c thread_bueno.c
 
 clean:
 	rm -f teoph *.o *~

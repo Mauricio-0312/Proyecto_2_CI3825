@@ -3,6 +3,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
+#include <sys/mman.h>
 
 // Estructura que representa una celda en la cuadrícula
 // tipo: 0 = Tierra Baldía (TB), 1 = Objetivo Militar (OM), 2 = Infraestructura Civil (IC)
@@ -10,6 +12,7 @@
 typedef struct {
     int tipo;
     int resistencia;
+    int resistencia_inicial;
 } Celda;
 
 // Estructura que representa un dron
@@ -19,6 +22,10 @@ typedef struct {
 typedef struct {
     int x, y, rd, pe;
 } Dron;
+
+
+// Mutex global para proteger la modificación de las celdas
+pthread_mutex_t mutex;
 
 // Función que procesa las explosiones de un rango de drones
 // Modifica la resistencia de los objetos en el área afectada
@@ -31,12 +38,16 @@ void procesar_drones(int inicio, int fin, int n, int m, Celda **teatro, Dron *dr
                 // Verifica que la celda esté dentro de los límites de la cuadrícula
                 if (i >= 0 && i < n && j >= 0 && j < m) {
                     Celda *celda = &teatro[i][j];
+
+                    pthread_mutex_lock(&mutex);
                     // Modifica la resistencia dependiendo del tipo de objeto
                     if (celda->tipo == 1) { // Objetivo militar (OM)
-                        celda->resistencia -= dron.pe;
-                    } else if (celda->tipo == 2) { // Infraestructura civil (IC)
                         celda->resistencia += dron.pe;
+                    } else if (celda->tipo == 2) { // Infraestructura civil (IC)
+                        celda->resistencia -= dron.pe;
                     }
+
+                    pthread_mutex_unlock(&mutex);
                 }
             }
         }
@@ -61,19 +72,19 @@ int main(int argc, char *argv[]) {
     int n, m, k, l;
     fscanf(archivo, "%d %d", &n, &m);
 
-    // Asigna memoria dinámica para la cuadrícula
-    Celda **teatro = (Celda **)malloc(n * sizeof(Celda *));
-    if (teatro == NULL) {
-        perror("Error al asignar memoria para la cuadrícula");
-        return 1;
+    pthread_mutex_init(&mutex, NULL);
+
+    Celda **teatro = (Celda **)mmap(NULL, n * sizeof(Celda *), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (teatro == MAP_FAILED) {
+        perror("Error mapeando la memoria");
+        exit(1);
     }
 
-    // Asigna memoria para cada fila de la cuadrícula
     for (int i = 0; i < n; i++) {
-        teatro[i] = (Celda *)calloc(m, sizeof(Celda));
-        if (teatro[i] == NULL) {
-            perror("Error al asignar memoria para una fila de la cuadrícula");
-            return 1;
+        teatro[i] = (Celda *)mmap(NULL, m * sizeof(Celda), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        if (teatro[i] == MAP_FAILED) {
+            perror("Error mapeando la memoria");
+            exit(1);
         }
     }
 
@@ -83,6 +94,7 @@ int main(int argc, char *argv[]) {
         int x, y, resistencia;
         fscanf(archivo, "%d %d %d", &x, &y, &resistencia);
         teatro[x][y].resistencia = resistencia;
+        teatro[x][y].resistencia_inicial = resistencia;
         teatro[x][y].tipo = (resistencia < 0) ? 1 : 2;
     }
 
@@ -92,7 +104,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < l; i++) {
         fscanf(archivo, "%d %d %d %d", &drones[i].x, &drones[i].y, &drones[i].rd, &drones[i].pe);
     }
-
+    fclose(archivo);
     // Calculamos el minimo entre el numero de drones y la cantidad de celdas
     int minimo = n*m < l ? n*m : l;
     
@@ -112,9 +124,27 @@ int main(int argc, char *argv[]) {
         pid_t pid = fork();
         if (pid == 0) { // Proceso hijo
             procesar_drones(inicio, fin, n, m, teatro, drones);
+             // Liberar memoria asignada para la cuadricula
+            for (int i = 0; i < n; i++) {
+                munmap(teatro[i], m * sizeof(Celda));
+            }
+            
+            munmap(teatro, n * sizeof(Celda *));
+            
+            // Destruye el mutex global
+            pthread_mutex_destroy(&mutex);
             exit(0);
         } else if (pid < 0) { // Error al crear proceso
             perror("Error creando proceso");
+             // Liberar memoria asignada para la cuadricula
+            for (int i = 0; i < n; i++) {
+                munmap(teatro[i], m * sizeof(Celda));
+            }
+            
+            munmap(teatro, n * sizeof(Celda *));
+            
+            // Destruye el mutex global
+            pthread_mutex_destroy(&mutex);
             exit(1);
         }
     }
@@ -131,14 +161,15 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < m; j++) {
+
             if (teatro[i][j].tipo == 1) {
-                if (teatro[i][j].resistencia <= 0) om_destruidos++;
-                else if (teatro[i][j].resistencia < -1) om_parciales++;
-                else om_intactos++;
+                if (teatro[i][j].resistencia == teatro[i][j].resistencia_inicial) om_intactos++;
+                if (teatro[i][j].resistencia >= 0) om_destruidos++;
+                if (teatro[i][j].resistencia < 0 && teatro[i][j].resistencia > teatro[i][j].resistencia_inicial) om_parciales++;
             } else if (teatro[i][j].tipo == 2) {
+                if (teatro[i][j].resistencia == teatro[i][j].resistencia_inicial) ic_intactos++;
                 if (teatro[i][j].resistencia <= 0) ic_destruidos++;
-                else if (teatro[i][j].resistencia > 1) ic_parciales++;
-                else ic_intactos++;
+                if (teatro[i][j].resistencia > 0 && teatro[i][j].resistencia < teatro[i][j].resistencia_inicial) ic_parciales++;
             }
         }
     }
@@ -150,16 +181,16 @@ int main(int argc, char *argv[]) {
     printf("IC sin destruir: %d\n", ic_intactos);
     printf("IC parcialmente destruidos: %d\n", ic_parciales);
     printf("IC totalmente destruidos: %d\n", ic_destruidos);
-
-
-    fclose(archivo);
-    // Libera la memoria asignada para la cuadrícula
+    
+    // Liberar memoria asignada para la cuadricula
     for (int i = 0; i < n; i++) {
-        free(teatro[i]);
-        //printf("Memoria liberada correctamente para la fila %d\n", i);
+        munmap(teatro[i], m * sizeof(Celda));
     }
-    free(teatro);
-    //printf("Memoria liberada correctamente para la cuadrícula\n");
+    
+    munmap(teatro, n * sizeof(Celda *));
+    
+    // Destruye el mutex global
+    pthread_mutex_destroy(&mutex);
 
     return 0;
 }

@@ -23,9 +23,7 @@
  *        Nivel de resistencia inicial del objeto en la celda.
  */
 typedef struct {
-    int tipo;
-    int resistencia;
-    int resistencia_inicial;
+    int tipo, resistencia, resistencia_inicial;
 } Celda;
 
 /**
@@ -175,6 +173,7 @@ int main(int argc, char *argv[]) {
     // Se crean los procesos para realizar el ataque de los drones en paralelo
     for (int i = 0; i < num_procesos; i++) {
         int inicio = i * (l / num_procesos);
+        
         int fin = (i == num_procesos - 1) ? l : inicio + (l / num_procesos);
 
         // Creamos proceso

@@ -3,34 +3,52 @@
 #include <pthread.h>
 
 
-// Estructura que representa una celda en la cuadrícula
-// tipo: 0 = Tierra Baldía (TB), 1 = Objetivo Militar (OM), 2 = Infraestructura Civil (IC)
-// resistencia: nivel de resistencia del objeto en la celda
+/**
+ * Estructura que representa una celda en el teatro (cuadricula).
+ * 
+ * @typedef Celda
+ * 
+ * @field tipo
+ *        Tipo de celda:
+ *        - 0: Tierra Baldía (TB)
+ *        - 1: Objetivo Militar (OM)
+ *        - 2: Infraestructura Civil (IC)
+ * 
+ * @field resistencia
+ *        Nivel de resistencia del objeto en la celda.
+ * 
+ * @field resistencia_inicial
+ *        Nivel de resistencia inicial del objeto en la celda.
+ */
 typedef struct {
-    int tipo;
-    int resistencia;
-    int resistencia_inicial;
-    int x, y;
+    int tipo, resistencia, resistencia_inicial;
 } Celda;
 
-// Estructura que representa un dron
-// x, y: coordenadas donde explota el dron
-// rd: radio de destrucción
-// pe: poder explosivo
+/**
+ * Estructura que representa un dron.
+ * 
+ * @typedef Dron
+ * 
+ * @field x Coordenada X donde explota el dron.
+ * @field y Coordenada Y donde explota el dron.
+ * @field rd Radio de destrucción del dron.
+ * @field pe Poder explosivo del dron.
+ */
 typedef struct {
     int x, y, rd, pe;
 } Dron;
 
-// Mutex global para proteger la modificación de las celdas
+// Mutex para proteger la modificación de las celdas
 pthread_mutex_t mutex;
 
 // Argumentos que se pasan a cada hilo
 typedef struct {
-    int inicio, fin;         // Rango de drones a procesar
-    int n, m;               // Dimensiones de la cuadrícula
-    int num_drones;         // Número total de drones
+    // Rango de drones a procesar
+    // Dimensiones de la cuadrícula
+    // Número total de drones
+    int inicio, fin, n, m, num_drones;         
     Celda ***teatro;         // Puntero a la cuadrícula
-    Celda *objetivos;
+    Celda *objetivos;       // Arreglo de  objetivos
     Dron *drones;           // Lista de drones
 } HiloArgs;
 

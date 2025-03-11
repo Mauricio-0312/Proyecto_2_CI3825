@@ -21,7 +21,8 @@
  *        Nivel de resistencia inicial del objeto en la celda.
  */
 typedef struct {
-    int tipo, resistencia, resistencia_inicial;
+    int tipo;
+    long long resistencia, resistencia_inicial;
 } Celda;
 
 /**
@@ -35,44 +36,74 @@ typedef struct {
  * @field pe Poder explosivo del dron.
  */
 typedef struct {
-    int x, y, rd, pe;
+    long long x, y, rd, pe;
 } Dron;
 
 // Mutex para proteger la modificación de las celdas
 pthread_mutex_t mutex;
 
-// Argumentos que se pasan a cada hilo
+/**
+ * Estructura que contiene los argumentos para los hilos.
+ * 
+ * @field inicio Rango inicial de drones a procesar.
+ * @field fin Rango final de drones a procesar.
+ * @field n Número de filas de la cuadrícula.
+ * @field m Número de columnas de la cuadrícula.
+ * @field num_drones Número total de drones.
+ * @field teatro Puntero a la cuadrícula de celdas.
+ * @field objetivos Arreglo de objetivos.
+ * @field drones Lista de drones.
+ */
 typedef struct {
-    // Rango de drones a procesar
-    // Dimensiones de la cuadrícula
-    // Número total de drones
-    int inicio, fin, n, m, num_drones;         
-    Celda ***teatro;         // Puntero a la cuadrícula
-    Celda *objetivos;       // Arreglo de  objetivos
-    Dron *drones;           // Lista de drones
+    long long inicio, fin, n, m, num_drones;         
+    Celda ***teatro, *objetivos; 
+    Dron *drones;           
 } HiloArgs;
 
-// Función que procesa la explosión de drones en un rango específico
+/**
+ * @brief Procesa la destruccion causada por los drones en el teatro.
+ *
+ * @param arg 
+ * 
+ * @return void.
+ *
+ * La funcion recorre el area de destrucción de cada dron en el rango especificado
+ * y modifica la resistencia de las celdas en funcion del tipo de objeto presente.
+ * Si la celda contiene un objetivo militar (OM), se incrementa su resistencia.
+ * Si la celda contiene infraestructura civil (IC), se decrementa su resistencia.
+ * La modificacion de la resistencia se realiza dentro de una seccion critica protegida
+ * por un mutex para asegurar la consistencia de los datos y evitar 
+ * condiciones de carrera.
+ */
 void *procesar_drones(void *arg) {
     HiloArgs *args = (HiloArgs *)arg;
-    for (int d = args->inicio; d < args->fin; d++) {
+
+    for (long long d = args->inicio; d < args->fin; d++) {
         Dron dron = args->drones[d];
-        // Recorre el área afectada por la explosión del dron
-        for (int i = dron.x - dron.rd; i <= dron.x + dron.rd; i++) {
-            for (int j = dron.y - dron.rd; j <= dron.y + dron.rd; j++) {
-                // Verifica si la celda está dentro de los límites de la cuadrícula
+
+         // Recorremos el area de destruccion del dron
+        for (long long i = dron.x - dron.rd; i <= dron.x + dron.rd; i++) {
+
+            for (long long j = dron.y - dron.rd; j <= dron.y + dron.rd; j++) {
+               // Verificamos que la celda esté dentro de los limites del teatro
                 if (i >= 0 && i < args->n && j >= 0 && j < args->m) {
                     Celda *celda = args->teatro[i][j];
-                    // Aplica el efecto del poder explosivo según el tipo de objeto
+                    
+                    // Verificamos si la celda tiene un objeto
                     if (celda != NULL){
-        
+                        
+                        // Bloqueamos seccion critica
                         pthread_mutex_lock(&mutex);
-                        if (celda->tipo == 1) {
-                            celda->resistencia += dron.pe; // Para OM, se resta el poder explosivo
-                        } else if (celda->tipo == 2) {
-                            celda->resistencia -= dron.pe; // Para IC, se suma el poder explosivo
+
+                         // Modifica la resistencia dependiendo del tipo de objeto
+                        if (celda->tipo == 1) { // Objetivo militar (OM)
+                            celda->resistencia += dron.pe; 
+                            
+                        } else if (celda->tipo == 2) { // Infraestructura civil (IC)
+                            celda->resistencia -= dron.pe;
                         }
 
+                        // Desbloqueamos seccion critica
                         pthread_mutex_unlock(&mutex);
                     }
                     else{
@@ -85,68 +116,86 @@ void *procesar_drones(void *arg) {
     return NULL;
 }
 
+// Funcion main donde se procesa el input
 int main(int argc, char *argv[]) {
+    // Verificamos el número correcto de argumentos
     if (argc != 3) {
         fprintf(stderr, "Uso: %s [n_hilos] [archivo_instancia]\n", argv[0]);
         return 1;
     }
 
-    int num_hilos = atoi(argv[1]);
+    long long num_hilos = atoi(argv[1]);
+
+    // Lectura del archivo
     FILE *archivo = fopen(argv[2], "r");
     if (!archivo) {
         perror("Error abriendo el archivo");
         return 1;
     }
 
-    int n, m, k, l;
-    fscanf(archivo, "%d %d", &n, &m);
+    // Variables para guardar datos de la lectura
+    long long n, m, k, l;
+
+    // Leemos las dimensiones del teatro
+    fscanf(archivo, "%lld %lld", &n, &m);
 
     // Inicializamos el mutex
     pthread_mutex_init(&mutex, NULL);
 
     // Creamos el teatro (cuadricula) de punteros y la inicializamos en NULL
     Celda ***teatro = (Celda ***)malloc(n * sizeof(Celda **));
-    for (int i = 0; i < n; i++) {
+    for (long long i = 0; i < n; i++) {
         teatro[i] = (Celda **)calloc(m, sizeof(Celda *));
-        for (int j = 0; j < m; j++){
+        for (long long j = 0; j < m; j++){
             teatro[i][j] = NULL;
         }
         
     }
 
-    fscanf(archivo, "%d", &k);
+    // Leemos la cantidad de objetos
+    fscanf(archivo, "%lld", &k);
 
+    // Creamos el arreglo que almacena los objetivos en el teatro
     Celda *objetivos = (Celda *)malloc(k * sizeof(Celda));
 
+    // Leemos cada uno de los objetos y se asignan en el teatro
+    for (long long i = 0; i < k; i++) {
+        long long x, y, resistencia;
 
-    for (int i = 0; i < k; i++) {
-        int x, y, resistencia;
-        fscanf(archivo, "%d %d %d", &x, &y, &resistencia);
-        // teatro[x][y].resistencia = resistencia;
-        // teatro[x][y].resistencia_inicial = resistencia;
-        // teatro[x][y].tipo = (resistencia < 0) ? 1 : 2;
-        // teatro[x][y].x = x;
-        // teatro[x][y].y = y;
+        // Leemos coordenadas y resistencia para cada objeto
+        fscanf(archivo, "%lld %lld %lld", &x, &y, &resistencia);
+
+        // Si es una tierra baldia, entonces pasamos al siguiente objeto
+        if (resistencia == 0){
+            continue;
+        }
+        // Se guarda el objeto en el arreglo
         objetivos[i].resistencia = resistencia;
         objetivos[i].resistencia_inicial = resistencia;
         objetivos[i].tipo = (resistencia < 0) ? 1 : 2;
-        objetivos[i].x = x;
-        objetivos[i].y = y;
+
+        // Se guarda el apuntador al objeto en el teatro
         teatro[x][y] = &objetivos[i];
     }
 
-    // Lee los drones
-    fscanf(archivo, "%d", &l);
+    // Leemos la cantidad drones
+    fscanf(archivo, "%lld", &l);
+
+    // Declaramos el arreglo de drones
     Dron drones[l];
-    for (int i = 0; i < l; i++) {
-        fscanf(archivo, "%d %d %d %d", &drones[i].x, &drones[i].y, &drones[i].rd, &drones[i].pe);
+    for (long long i = 0; i < l; i++) {
+        fscanf(archivo, "%lld %lld %lld %lld", &drones[i].x, &drones[i].y, 
+            &drones[i].rd, &drones[i].pe);
     }
 
-    // Crea los hilos y distribuye el trabajo entre ellos
+    // Creamos el arreglo de hilos
     pthread_t hilos[num_hilos];
+
+    // Creamos el arreglo de los argumentos para cada hilo
     HiloArgs args[num_hilos];
 
-    for (int i = 0; i < num_hilos; i++) {
+    // Se asigna los argumentos a cada hilo
+    for (long long i = 0; i < num_hilos; i++) {
         args[i].inicio = i * (l / num_hilos);
         args[i].fin = (i == num_hilos - 1) ? l : args[i].inicio + (l / num_hilos);
         args[i].n = n;
@@ -155,51 +204,68 @@ int main(int argc, char *argv[]) {
         args[i].objetivos = objetivos;
         args[i].teatro = teatro;
         args[i].drones = drones;
+
+        // Se crea el hilo para que ejecute la funcion procesar_drones con sus 
+        //respectivos argumentos
         if (pthread_create(&hilos[i], NULL, procesar_drones, &args[i]) != 0) {
             perror("Error creando hilo");
             exit(1);
         }
     }
 
-    // Espera a que todos los hilos terminen
-    for (int i = 0; i < num_hilos; i++) {
+    // Esperamos a que todos los hilos terminen
+    for (long long i = 0; i < num_hilos; i++) {
         if (pthread_join(hilos[i], NULL) != 0) {
             perror("Error al esperar hilo");
             exit(1);
         }
     }
 
-    // Cuenta el estado final de los objetos
-    int om_intactos = 0, om_parciales = 0, om_destruidos = 0;
-    int ic_intactos = 0, ic_parciales = 0, ic_destruidos = 0;
+    // Variables para guardar los resultados
+    long long om_intactos = 0, om_parciales = 0, om_destruidos = 0, 
+              ic_intactos = 0, ic_parciales = 0, ic_destruidos = 0;
 
-    // Iteramos sobre el arreglo de objetivos
-    for (int i = 0; i < k; i++) {
+    // Recorremos el arreglo de objetivos para analizar los resultados luego del ataque
+    for (long long i = 0; i < k; i++) {
         if (objetivos[i].tipo == 1) {
-            if (objetivos[i].resistencia == objetivos[i].resistencia_inicial) om_intactos++;
-            if (objetivos[i].resistencia >= 0) om_destruidos++;
-            if (objetivos[i].resistencia < 0 && objetivos[i].resistencia > objetivos[i].resistencia_inicial) om_parciales++;
+            if (objetivos[i].resistencia == objetivos[i].resistencia_inicial) {
+                om_intactos++;
+            }
+            else if (objetivos[i].resistencia >= 0) {
+                om_destruidos++;
+            }
+            else if (objetivos[i].resistencia < 0 && objetivos[i].resistencia > objetivos[i].resistencia_inicial) {
+                om_parciales++;
+            }
         } else if (objetivos[i].tipo == 2) {
-            if (objetivos[i].resistencia == objetivos[i].resistencia_inicial) ic_intactos++;
-            if (objetivos[i].resistencia <= 0) ic_destruidos++;
-            if (objetivos[i].resistencia > 0 && objetivos[i].resistencia < objetivos[i].resistencia_inicial) ic_parciales++;
+            if (objetivos[i].resistencia == objetivos[i].resistencia_inicial) {
+                ic_intactos++;
+            }
+            else if (objetivos[i].resistencia <= 0) {
+                ic_destruidos++;
+            }
+            else if (objetivos[i].resistencia > 0 && objetivos[i].resistencia < objetivos[i].resistencia_inicial) {
+                ic_parciales++;
+            }
         }     
     }
 
-    // Imprime los resultados
-    printf("OM intactos: %d\n", om_intactos);
-    printf("OM parcialmente destruidos: %d\n", om_parciales);
-    printf("OM totalmente destruidos: %d\n", om_destruidos);
-    printf("IC intactos: %d\n", ic_intactos);
-    printf("IC parcialmente destruidos: %d\n", ic_parciales);
-    printf("IC totalmente destruidos: %d\n", ic_destruidos);
+    // Imprimimos los resultados
+    printf("OM intactos: %lld\n", om_intactos);
+    printf("OM parcialmente destruidos: %lld\n", om_parciales);
+    printf("OM totalmente destruidos: %lld\n", om_destruidos);
+    printf("IC intactos: %lld\n", ic_intactos);
+    printf("IC parcialmente destruidos: %lld\n", ic_parciales);
+    printf("IC totalmente destruidos: %lld\n", ic_destruidos);
 
     // Libera la memoria dinámica
-    for (int i = 0; i < n; i++) {
+    for (long long i = 0; i < n; i++) {
         free(teatro[i]);
     }
     free(teatro);
     free(objetivos);
+
+    // Destruye el mutex
     pthread_mutex_destroy(&mutex);
 
     fclose(archivo);

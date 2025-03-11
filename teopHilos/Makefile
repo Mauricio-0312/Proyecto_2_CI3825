@@ -8,7 +8,7 @@ CC=gcc
 # Flags para debbugging #
 ########################
 
-CFLAGS=-Wall -Wextra -Wdouble-promotion -Wno-unused-parameter  -Wno-unused-function -Wno-sign-conversion -Werror -fsanitize=undefined -std=gnu2x -O0 -ggdb
+CFLAGS=-Wall -Wextra -Wdouble-promotion -Wno-unused-parameter  -Wno-unused-function -Wno-sign-conversion -Werror -fsanitize=undefined -std=gnu23 -O0 -ggdb
 
 
 ###############

@@ -118,6 +118,7 @@ void *procesar_drones(void *arg) {
 
 // Funcion main donde se procesa el input
 int main(int argc, char *argv[]) {
+    
     // Verificamos el número correcto de argumentos
     if (argc != 3) {
         fprintf(stderr, "Uso: %s [n_hilos] [archivo_instancia]\n", argv[0]);
@@ -142,6 +143,7 @@ int main(int argc, char *argv[]) {
     // Inicializamos el mutex
     pthread_mutex_init(&mutex, NULL);
 
+    //printf("Hola2\n");
     // Creamos el teatro (cuadricula) de punteros y la inicializamos en NULL
     Celda ***teatro = (Celda ***)malloc(n * sizeof(Celda **));
     for (long long i = 0; i < n; i++) {
@@ -152,16 +154,19 @@ int main(int argc, char *argv[]) {
         
     }
 
+   
     // Leemos la cantidad de objetos
     fscanf(archivo, "%lld", &k);
 
+    
     // Creamos el arreglo que almacena los objetivos en el teatro
-    Celda *objetivos = (Celda *)malloc(k * sizeof(Celda));
-
+    Celda *objetivos = (Celda *)calloc(k, sizeof(Celda));
+    
+    
     // Leemos cada uno de los objetos y se asignan en el teatro
     for (long long i = 0; i < k; i++) {
         long long x, y, resistencia;
-
+        
         // Leemos coordenadas y resistencia para cada objeto
         fscanf(archivo, "%lld %lld %lld", &x, &y, &resistencia);
 
@@ -177,23 +182,35 @@ int main(int argc, char *argv[]) {
         // Se guarda el apuntador al objeto en el teatro
         teatro[x][y] = &objetivos[i];
     }
-
+    
     // Leemos la cantidad drones
     fscanf(archivo, "%lld", &l);
+    
+    // Calculamos el minimo entre el numero de drones y la cantidad de celdas
+    long long minimo = n*m < l ? n*m : l;
+
+    // Si el numero de procesos ingresados por el usuario es mayor que "minimo", entonces el numero
+    // de procesos pasa a ser este minimo.
+    if (num_hilos > minimo){
+        num_hilos = minimo;
+    }
 
     // Declaramos el arreglo de drones
-    Dron drones[l];
+    Dron *drones = (Dron *)malloc(l * sizeof(Dron));
+    
     for (long long i = 0; i < l; i++) {
         fscanf(archivo, "%lld %lld %lld %lld", &drones[i].x, &drones[i].y, 
             &drones[i].rd, &drones[i].pe);
     }
-
+    
     // Creamos el arreglo de hilos
-    pthread_t hilos[num_hilos];
+   
+    pthread_t *hilos = (pthread_t *)malloc(num_hilos * sizeof(pthread_t));
 
     // Creamos el arreglo de los argumentos para cada hilo
-    HiloArgs args[num_hilos];
-
+    
+    HiloArgs *args = (HiloArgs *)malloc(num_hilos * sizeof(HiloArgs));
+    
     // Se asigna los argumentos a cada hilo
     for (long long i = 0; i < num_hilos; i++) {
         args[i].inicio = i * (l / num_hilos);
@@ -262,8 +279,13 @@ int main(int argc, char *argv[]) {
     for (long long i = 0; i < n; i++) {
         free(teatro[i]);
     }
+
+    // Liberamos memoria
     free(teatro);
     free(objetivos);
+    free(drones);
+    free(hilos);
+    free(args);
 
     // Destruye el mutex
     pthread_mutex_destroy(&mutex);

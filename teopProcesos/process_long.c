@@ -98,7 +98,6 @@ void procesar_drones(long long inicio, long long fin, long long n, long long m, 
 
 // Funcion donde se procesa el input
 int main(int argc, char *argv[]) {
-
     // Verificamos el número correcto de argumentos
     if (argc != 3) {
         fprintf(stderr, "Uso: %s [n_procesos] [archivo_instancia]\n", argv[0]);
@@ -161,8 +160,9 @@ int main(int argc, char *argv[]) {
     // Leemos la cantidad de drones
     fscanf(archivo, "%lld", &l);
 
-    // Declaramos el arreglo de drones
-    Dron drones[l];
+    // Declaramos el arreglo de drones 
+    Dron *drones = (Dron *)malloc(l * sizeof(Dron));
+    
     for (long long i = 0; i < l; i++) {
         fscanf(archivo, "%lld %lld %lld %lld", &drones[i].x, &drones[i].y, 
                &drones[i].rd, &drones[i].pe);
@@ -199,6 +199,7 @@ int main(int argc, char *argv[]) {
             
             munmap(teatro, n * sizeof(Celda *));
             
+            free(drones);
             // Destruimos el mutex
             pthread_mutex_destroy(&mutex);
 
@@ -214,7 +215,7 @@ int main(int argc, char *argv[]) {
             }
             
             munmap(teatro, n * sizeof(Celda *));
-            
+            free(drones);
             // Destruimos el mutex
             pthread_mutex_destroy(&mutex);
 
@@ -280,7 +281,7 @@ int main(int argc, char *argv[]) {
     }
     
     munmap(teatro, n * sizeof(Celda *));
-    
+    free(drones);
     // Destruimos el mutex
     pthread_mutex_destroy(&mutex);
 

@@ -27,11 +27,11 @@ PROG=teopp
 
 ALL: $(PROG)
 
-$(PROG): process_long.o
-	$(CC) $(CFLAGS) $(LIBS) -o $(PROG) process_long.o
+$(PROG): process.o
+	$(CC) $(CFLAGS) $(LIBS) -o $(PROG) process.o
 
 thread.o: process.c
-	$(CC) $(CFLAGS) -c process_long.c
+	$(CC) $(CFLAGS) -c process.c
 
 
 ## Limpieza ##
